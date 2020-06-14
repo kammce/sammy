@@ -3,6 +3,8 @@
 import click
 import re
 import sys
+import shutil
+import os
 from pathlib import Path
 import subprocess
 
@@ -13,7 +15,7 @@ def get_sjsu_dev2_path():
   home = str(Path.home())
 
   # Open the .sjsu_dev2.mk and read its contents
-  root_mk_file = open('{}/.sjsu_dev2.mk'.format(home), 'r')
+  root_mk_file = open(f'{home}/.sjsu_dev2.mk', 'r')
   root_mk_contents = root_mk_file.read()
 
   # Use regex to parse just for the location variable
@@ -66,7 +68,7 @@ def update():
 
   if current_branch != b'master\n':
     print('SJSU-Dev2 must be on the master branch to be updated!')
-    print('>> Current branch is: {}'.format(current_branch.decode('utf-8')))
+    print(f'>> Current branch is: {current_branch.decode("utf-8")}')
     return
 
   print('Updating SJSU-Dev2 ...\n')
@@ -86,11 +88,19 @@ def project():
 
 
 @project.command()
-def start():
+@click.argument('project_name')
+def start(project_name):
   """
   Start a new firmware project.
   """
-  print("Creating firmware project in <name> directory")
+  platform_path = get_sjsu_dev2_path()
+
+  try:
+    shutil.copytree(f'{platform_path}/projects/starter/', project_name)
+    print(f'Creating firmware project in "{project_name}" directory')
+  except FileExistsError:
+    sys.exit((f'Failed to create project, project directory "{project_name}" '
+            'already exists'))
 
 
 @main.command()
