@@ -7,15 +7,16 @@ import shutil
 import os
 from pathlib import Path
 import subprocess
+import platform as environment_platform
 
 
 def get_sjsu_dev2_path():
   # Get the user's home directory where the SJSU-Dev2's location file should
   # live
-  home = str(Path.home())
+  home_directory = str(Path.home())
 
   # Open the .sjsu_dev2.mk and read its contents
-  root_mk_file = open(f'{home}/.sjsu_dev2.mk', 'r')
+  root_mk_file = open(f'{home_directory}/.sjsu_dev2.mk', 'r')
   root_mk_contents = root_mk_file.read()
 
   # Use regex to parse just for the location variable
@@ -47,8 +48,60 @@ def install():
   """
   Install SJSU-Dev2 on your computer.
   """
-  print("I install SJSU-Dev2 in your home directory")
+  try:
+    # If SJSU-Dev2 is not installed (location file cannot be found), this will
+    # throw an exception, meaning we should proceed.
+    # If this is successful, then we must exit as we do not want to overwrite
+    # the previous SJSU-Dev2 instance.
+    platform_path = get_sjsu_dev2_path()
+    platform_exists = os.path.isdir(platform_path)
 
+    if platform_exists:
+      sys.exit(f'SJSU-Dev2 is already installed in location "{platform_path}"')
+
+  except FileNotFoundError:
+    pass
+
+  operating_system = environment_platform.system()
+
+  print('\nInstalling GIT...\n')
+
+  if operating_system == 'Linux':
+    subprocess.Popen(['sudo', 'apt', 'install', '-y', 'git'],
+                     stdout=sys.stdout,
+                     stderr=sys.stderr).communicate()
+  elif operating_system == 'Darwin':
+    subprocess.Popen(['git', '--version'],
+                     stdout=sys.stdout,
+                     stderr=sys.stderr).communicate()
+  else:
+    sys.exit('Invalid operating system!')
+
+  print('\nGIT Installed!')
+
+  print('\nDownloading SJSU-Dev2 Repo...\n')
+
+  # Get the user's home directory where the SJSU-Dev2's location file should
+  # live
+  home_directory = str(Path.home())
+
+  # Clone SJSU-Dev2 into the home directory
+  subprocess.Popen(['git', 'clone',
+                    'https://github.com/SJSU-Dev2/SJSU-Dev2.git'],
+                   cwd=home_directory,
+                   stdout=sys.stdout,
+                   stderr=sys.stderr).communicate()
+
+  print('\nRunning SJSU-Dev2 setup...\n')
+
+  # Run setup for SJSU-Dev2 to download, install and configure the tools needed
+  # for SJSU-Dev2.
+  subprocess.Popen(['./setup'],
+                   cwd=f'{home_directory}/SJSU-Dev2',
+                   stdout=sys.stdout,
+                   stderr=sys.stderr).communicate()
+
+  print('\nSJSU-Dev2 has been successfully installed!')
 
 @platform.command()
 def update():
@@ -78,9 +131,9 @@ def update():
   print('Updating SJSU-Dev2 ...\n')
 
   subprocess.Popen(['git', 'pull', 'origin', 'master'],
-                    stdout=sys.stdout,
-                    stderr=sys.stderr,
-                    cwd=platform_path).communicate()
+                   stdout=sys.stdout,
+                   stderr=sys.stderr,
+                   cwd=platform_path).communicate()
 
 
 @platform.command()
