@@ -57,7 +57,11 @@ def update():
 
   This works even if you did not install SJSU-Dev2 in the home directory.
   """
-  platform_path = get_sjsu_dev2_path()
+  try:
+    platform_path = get_sjsu_dev2_path()
+  except FileNotFoundError:
+    sys.exit(('Could not find SJSU-Dev2 location file. Make sure SJSU-Dev2 is '
+              'installed.'))
 
   # Returns just the branch name of the current branch being used in SJSU-Dev2
   proc = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
@@ -67,16 +71,25 @@ def update():
   current_branch = proc.stdout.read()
 
   if current_branch != b'master\n':
-    print('SJSU-Dev2 must be on the master branch to be updated!')
-    print(f'>> Current branch is: {current_branch.decode("utf-8")}')
+    sys.exit((f'SJSU-Dev2 must be on the master branch to be updated!'
+              f'>> Current branch is: {current_branch.decode("utf-8")}'))
     return
 
   print('Updating SJSU-Dev2 ...\n')
 
   subprocess.Popen(['git', 'pull', 'origin', 'master'],
-                   stdout=sys.stdout,
-                   stderr=sys.stderr,
-                   cwd=platform_path).communicate()
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    cwd=platform_path).communicate()
+
+
+@platform.command()
+def complete_update():
+  """
+  Will update SJSU-Dev2 and re-run setup, which will handle updating and
+  upgrading the necessary tools needed for SJSU-Dev2 project.
+  """
+  print("Not implemented.")
 
 
 @main.group()
@@ -100,7 +113,7 @@ def start(project_name):
     print(f'Creating firmware project in "{project_name}" directory')
   except FileExistsError:
     sys.exit((f'Failed to create project, project directory "{project_name}" '
-            'already exists'))
+              'already exists'))
 
 
 @main.command()
