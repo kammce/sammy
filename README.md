@@ -3,6 +3,19 @@
 Sammy is a tool for managing SJSU-Dev2 firmware projects and to install external
 packages such as platforms and libraries.
 
+## Quick Start
+
+```bash
+# Install sammy tool
+pip install sammy-sjsu-dev2
+
+# Install SJSU-Dev2
+sammy platform install
+
+# Create a new project where "my_project" can be any valid folder name
+sammy project start my_project
+```
+
 ## Dependencies
 
 * python3.6 and above
@@ -19,10 +32,24 @@ or
 python3 -m pip install sammy-sjsu-dev2
 ```
 
+or, if pip already points to the python3 version simply run:
+
+```bash
+pip install sammy-sjsu-dev2
+```
+
 ## Usage
 
 Run `sammy --help` to get information about how to use sammy and what it can do.
 A quick guide on the most common commands for sammy are listed here.
+
+### Installing SJSU-Dev2
+
+The easiest way to install SJSU-Dev2 is to do it the automated way via `sammy`.
+
+```bash
+sammy platform install
+```
 
 ### Updating SJSU-Dev2
 
