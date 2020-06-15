@@ -1,0 +1,23 @@
+language: generic
+
+script:
+  - python3 -m pip install setuptools
+  - python3 -m pip install .
+  - sammy platform install
+  - sammy platform update
+  - sammy project start azer
+  - cd azer
+  - make application
+after_success:
+  - echo "DONE!"
+
+jobs:
+    include:
+        - os: linux
+          dist: bionic
+          install:
+            - sudo apt-get install python3-pip
+        - os: osx
+          osx_image: xcode10
+        - os: osx
+          osx_image: xcode11.3

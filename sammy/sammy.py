@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import click
+# Standard libraries
 import re
 import sys
 import shutil
@@ -9,6 +9,8 @@ from pathlib import Path
 import subprocess
 import platform as environment_platform
 
+# External dependencies
+import click
 
 def get_sjsu_dev2_path():
   # Get the user's home directory where the SJSU-Dev2's location file should
