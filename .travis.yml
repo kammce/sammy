@@ -3,11 +3,9 @@ language: generic
 script:
   - python3 -m pip install setuptools
   - python3 -m pip install .
-  - sammy platform install
-  - sammy platform update
-  - sammy project start azer
-  - cd azer
-  - make application
+  - ./tests/platform_install.sh
+  - ./tests/platform_update.sh
+  - ./tests/project_start.sh
 after_success:
   - echo "DONE!"
 
