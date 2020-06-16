@@ -5,12 +5,24 @@ import re
 import sys
 import shutil
 import os
+import logging
 from pathlib import Path
 import subprocess
 import platform as environment_platform
 
 # External dependencies
 import click
+import coloredlogs
+
+# Create a logger object.
+logger = logging.getLogger(__name__)
+
+# By default the install() function installs a handler on the root logger,
+# this means that log messages from your code and log messages from the
+# libraries that you use will all show up on the terminal.
+coloredlogs.install(level='INFO',
+    fmt='%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s')
+
 
 def get_sjsu_dev2_path():
   # Get the user's home directory where the SJSU-Dev2's location file should
@@ -66,7 +78,7 @@ def install():
 
   operating_system = environment_platform.system()
 
-  print('\nInstalling GIT...\n')
+  logging.info('Installing GIT...')
 
   if operating_system == 'Linux':
     subprocess.Popen(['sudo', 'apt', 'install', '-y', 'git'],
@@ -77,11 +89,12 @@ def install():
                      stdout=sys.stdout,
                      stderr=sys.stderr).communicate()
   else:
-    sys.exit('Invalid operating system!')
+    logging.error('Invalid operating system!')
+    sys.exit(1)
 
-  print('\nGIT Installed!')
+  logging.info('GIT Installed!')
 
-  print('\nDownloading SJSU-Dev2 Repo...\n')
+  logging.info('Downloading SJSU-Dev2 Repo...')
 
   # Get the user's home directory where the SJSU-Dev2's location file should
   # live
@@ -94,7 +107,7 @@ def install():
                    stdout=sys.stdout,
                    stderr=sys.stderr).communicate()
 
-  print('\nRunning SJSU-Dev2 setup...\n')
+  logging.info('Running SJSU-Dev2 setup...')
 
   # Run setup for SJSU-Dev2 to download, install and configure the tools needed
   # for SJSU-Dev2.
@@ -103,7 +116,7 @@ def install():
                    stdout=sys.stdout,
                    stderr=sys.stderr).communicate()
 
-  print('\nSJSU-Dev2 has been successfully installed!')
+  logging.info('SJSU-Dev2 has been successfully installed!')
 
 @platform.command()
 def update():
@@ -115,8 +128,9 @@ def update():
   try:
     platform_path = get_sjsu_dev2_path()
   except FileNotFoundError:
-    sys.exit(('Could not find SJSU-Dev2 location file. Make sure SJSU-Dev2 is '
-              'installed.'))
+    logging.error(('Could not find SJSU-Dev2 location file. Make sure '
+                   'SJSU-Dev2 is installed.'))
+    sys.exit(1)
 
   # Returns just the branch name of the current branch being used in SJSU-Dev2
   proc = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
@@ -126,11 +140,12 @@ def update():
   current_branch = proc.stdout.read()
 
   if current_branch != b'master\n':
-    sys.exit((f'SJSU-Dev2 must be on the master branch to be updated!'
-              f'>> Current branch is: {current_branch.decode("utf-8")}'))
+    logging.error(f'SJSU-Dev2 must be on the master branch to be updated!')
+    logging.error(f'>> Current branch is: {current_branch.decode("utf-8")}')
+    sys.exit(1)
     return
 
-  print('Updating SJSU-Dev2 ...\n')
+  logging.info('Updating SJSU-Dev2 ...')
 
   subprocess.Popen(['git', 'pull', 'origin', 'master'],
                    stdout=sys.stdout,
@@ -144,7 +159,7 @@ def complete_update():
   Will update SJSU-Dev2 and re-run setup, which will handle updating and
   upgrading the necessary tools needed for SJSU-Dev2 project.
   """
-  print("Not implemented.")
+  logging.info("Not implemented.")
 
 
 @main.group()
@@ -165,10 +180,11 @@ def start(project_name):
 
   try:
     shutil.copytree(f'{platform_path}/projects/starter/', project_name)
-    print(f'Creating firmware project in "{project_name}" directory')
+    logging.info(f'Creating firmware project in "{project_name}" directory')
   except FileExistsError:
-    sys.exit((f'Failed to create project, project directory "{project_name}" '
-              'already exists'))
+    logging.error(('Failed to create project, project directory '
+                   f'"{project_name}" already exists'))
+    sys.exit(1)
 
 
 @main.command()
@@ -176,7 +192,7 @@ def build():
   """
   Build projects firmware
   """
-  print("Not implemented.")
+  logging.info("Not implemented.")
 
 
 if __name__ == "__main__":
