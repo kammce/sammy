@@ -195,5 +195,6 @@ def build():
   logging.info("Not implemented.")
 
 
+# Start of the main program
 if __name__ == "__main__":
   main()
