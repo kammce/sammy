@@ -77,20 +77,23 @@ def install():
     pass
 
   operating_system = environment_platform.system()
+  logging.info('Checking if GIT is installed...')
+  try:
+    subprocess.call(["git", "--version"])
+  except FileNotFoundError:
+    logging.info('Installing GIT...')
 
-  logging.info('Installing GIT...')
-
-  if operating_system == 'Linux':
-    subprocess.Popen(['sudo', 'apt', 'install', '-y', 'git'],
-                     stdout=sys.stdout,
-                     stderr=sys.stderr).communicate()
-  elif operating_system == 'Darwin':
-    subprocess.Popen(['git', '--version'],
-                     stdout=sys.stdout,
-                     stderr=sys.stderr).communicate()
-  else:
-    logging.error('Invalid operating system!')
-    sys.exit(1)
+    if operating_system == 'Linux':
+      subprocess.Popen(['sudo', 'apt', 'install', '-y', 'git'],
+                      stdout=sys.stdout,
+                      stderr=sys.stderr).communicate()
+    elif operating_system == 'Darwin':
+      subprocess.Popen(['git', '--version'],
+                      stdout=sys.stdout,
+                      stderr=sys.stderr).communicate()
+    else:
+      logging.error('Invalid operating system!')
+      sys.exit(1)
 
   logging.info('GIT Installed!')
 
