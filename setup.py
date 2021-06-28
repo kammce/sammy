@@ -23,6 +23,7 @@ setuptools.setup(
     python_requires='>=3.6',
     install_requires=[
       'click>=8.0',
-      'coloredlogs>=14.0'
+      'giturlparse>=0.10.0',
+      'requests>=2.25.1',
     ]
 )
