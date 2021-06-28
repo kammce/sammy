@@ -1,20 +1,37 @@
 #!/usr/bin/env python3
 
 # Standard libraries
-import re
-import sys
-import shutil
 import os
+import shutil
+import time
 from pathlib import Path, PurePath
-import subprocess
-import platform as environment_platform
 
 # External dependencies
 import click
+import requests
+from tqdm import tqdm
+from git import Repo, Git, RemoteProgress
 
 
 CHECK_MARK = '\u001b[32m\N{check mark}\u001b[0m'
 CROSS_MARK = '\u001b[31m\N{cross mark}\u001b[0m'
+
+SJSU_DEV2_URL = 'https://github.com/SJSU-Dev2'
+LIBCORE_URL = f'f{SJSU_DEV2_URL}/liblpc40xx.git'
+ARM_TOOLCHAIN_URL = f'{SJSU_DEV2_URL}/gcc-arm-none-eabi-nano-exceptions.git'
+
+
+class CloneProgress(RemoteProgress):
+  def __init__(self):
+    super().__init__()
+    self.pbar = tqdm()
+
+  def update(self, op_code, cur_count, max_count=None, message=''):
+    self.pbar.total = max_count
+    self.pbar.n = cur_count
+    self.pbar.refresh()
+    if max_count == cur_count:
+      print("", flush=True)
 
 
 def GenerateAndCheck(start_message, command_string, error_message):
@@ -63,21 +80,89 @@ def project():
 
 
 @project.command()
-@click.argument('project_name')
-def start(project_name):
+def init():
+  """
+  Make the current directory into a SJSU-Dev2 project
+  """
+  Path('.sj2').mkdir(exist_ok=True)
+  Path('.sj2/reserved').touch(exist_ok=True)
+  Path('library').mkdir(exist_ok=True)
+  Path('packages').mkdir(exist_ok=True)
+
+
+@project.command()
+@click.pass_context
+@click.argument('project_name', type=click.Path(exists=False))
+def start(context, project_name):
   """
   Start a new firmware project.
   """
-  pass
+
+  Path(project_name).mkdir()
+
+  Path(f'{project_name}/.sj2').mkdir(exist_ok=True)
+  Path(f'{project_name}/.sj2/reserved').touch(exist_ok=True)
+  Path(f'{project_name}/library').mkdir(exist_ok=True)
+  Path(f'{project_name}/packages').mkdir(exist_ok=True)
+
+  os.chdir(project_name)
+
+  context.invoke(install, library="libcore", tag="main")
+  context.invoke(install, library="gcc-arm-none-eabi-nano-exceptions",
+                 tag="gcc10-2020-q2-preview")
 
 
 @project.command()
 @click.argument('library')
-def install(library):
+@click.option('--tag', '-t', type=str, default='main')
+def install(library, tag):
   """
   Download and install library to project
   """
-  pass
+
+  try:
+    PROJECT_DIRECTORY = FileUpsearch('.sj2', '.')
+  except:
+    click.secho(f"Could not find a SJSU-Dev2 project!", fg="red")
+    return
+
+  sj2_repo_info = requests.get('https://api.github.com/orgs/SJSU-Dev2/repos',
+                               params={'per_page': 500}).json()
+  sj2_repo_list = [x['name'] for x in sj2_repo_info]
+  if library in sj2_repo_list:
+    click.secho(f'Downloading {library}...', fg='white', bold=True)
+    Repo.clone_from(f'{SJSU_DEV2_URL}/{library}.git',
+                    f'{PROJECT_DIRECTORY}/packages/{library}', branch=tag,
+                    progress=CloneProgress())
+    time.sleep(0.1)
+    click.secho(f'Linking {library}...', fg='white', bold=True)
+    Path(f'{PROJECT_DIRECTORY}/library/{library}').unlink(missing_ok=True)
+    Path(f'{PROJECT_DIRECTORY}/library/{library}').symlink_to(
+        f'{PROJECT_DIRECTORY}/packages/{library}/{library}')
+  else:
+    click.secho(
+        f'Could not find "{library}" in SJSU-Dev2 repos list!',
+        fg='red')
+    click.secho(
+        "Installing non-SJSU-Dev2 libraries is currently not supported!",
+        fg="red")
+
+
+@project.command()
+@click.argument('library')
+def remove(library):
+  """
+  Delete library from project
+  """
+
+  try:
+    PROJECT_DIRECTORY = FileUpsearch('.sj2', '.')
+  except:
+    click.secho(f"Could not find a SJSU-Dev2 project!", fg="red")
+    return
+
+  Path(f'{PROJECT_DIRECTORY}/library/{library}').unlink(missing_ok=True)
+  shutil.rmtree(f'{PROJECT_DIRECTORY}/packages/{library}/')
 
 
 @main.command()
