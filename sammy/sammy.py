@@ -80,15 +80,7 @@ def main():
   pass
 
 
-@main.group()
-def project():
-  """
-  Start and configure firmware projects
-  """
-  pass
-
-
-@project.command()
+@main.command()
 @click.pass_context
 @click.argument('project_name', type=click.Path(exists=False))
 def start(context, project_name):
@@ -126,7 +118,7 @@ def start(context, project_name):
                  tag="gcc10-2020-q2-preview", project_directory=project_name)
 
 
-@project.command()
+@main.command()
 @click.argument('library')
 @click.option('--project_directory', '-d', type=click.Path(exists=True),
               default='.')
@@ -177,13 +169,19 @@ def install(library, project_directory, tag):
   click.echo('')
 
 
-@project.command()
+@main.command()
 def list():
-  click.secho('List of package repos in SJSU-Dev2\n', fg='white', bold=True)
-  print('\n'.join(GetListOfSJSUDev2Repos()))
+  """
+  List libraries available from the SJSU-Dev2 organization
+  """
+
+  click.secho('List of libraries in SJSU-Dev2\n', fg='white', bold=True)
+  sj2_repo_list = GetListOfSJSUDev2Repos()
+  library_list = [x for x in sj2_repo_list if x.startswith('lib')]
+  print('\n'.join(library_list))
 
 
-@project.command()
+@main.command()
 @click.argument('library')
 @click.option('--project_directory', '-d', type=click.Path(exists=True),
               default='.')
