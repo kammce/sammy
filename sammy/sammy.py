@@ -65,6 +65,12 @@ def FileUpsearch(file_name, starting_position):
         cur_dir = parent_dir
 
 
+def GetListOfSJSUDev2Repos():
+  sj2_repo_info = requests.get('https://api.github.com/orgs/SJSU-Dev2/repos',
+                               params={'per_page': 500}).json()
+  return [x['name'] for x in sj2_repo_info]
+
+
 @click.group()
 def main():
   """
@@ -138,9 +144,7 @@ def install(library, project_directory, tag):
 
   os.chdir(f'{PROJECT_DIRECTORY}/packages/')
 
-  sj2_repo_info = requests.get('https://api.github.com/orgs/SJSU-Dev2/repos',
-                               params={'per_page': 500}).json()
-  sj2_repo_list = [x['name'] for x in sj2_repo_info]
+  sj2_repo_list = GetListOfSJSUDev2Repos()
 
   click.secho(f'Installing library: {library}', fg='white', bold=True)
 
@@ -171,6 +175,12 @@ def install(library, project_directory, tag):
     click.echo(CROSS_MARK)
 
   click.echo('')
+
+
+@project.command()
+def list():
+  click.secho('List of package repos in SJSU-Dev2\n', fg='white', bold=True)
+  print('\n'.join(GetListOfSJSUDev2Repos()))
 
 
 @project.command()
