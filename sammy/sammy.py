@@ -3,6 +3,7 @@
 # Standard libraries
 import os
 import shutil
+import platform
 from pathlib import Path, PurePath
 
 # External dependencies
@@ -15,18 +16,53 @@ CHECK_MARK = '\u001b[32m\N{white heavy check mark}\u001b[0m'
 CROSS_MARK = '\u001b[31m\N{cross mark}\u001b[0m'
 
 SJSU_DEV2_URL = 'https://github.com/SJSU-Dev2'
-LIBCORE_URL = f'f{SJSU_DEV2_URL}/liblpc40xx.git'
-ARM_TOOLCHAIN_URL = f'{SJSU_DEV2_URL}/gcc-arm-none-eabi-nano-exceptions.git'
 
 BASIC_MAIN_CPP = """
-# include <libcore/utility/log.hpp>
+#include <libcore/platform/syscall.hpp>
+#include <libcore/utility/build_info.hpp>
+#include <libcore/utility/log.hpp>
+#include <libcore/utility/time/time.hpp>
+#include <liblpc40xx/peripherals/gpio.hpp>
+#include <liblpc40xx/peripherals/uart.hpp>
+#include <liblpc40xx/platform/startup.hpp>
 
 int main()
 {
-  for (int i = 0; i < 15; i++)
+  // Step 1. Initialize clocks, peripheral power, and system timers.
+  sjsu::lpc40xx::InitializePlatform();
+
+  // Step 2. Create the peripherals needed for the project.
+  sjsu::Gpio & led         = sjsu::lpc40xx::GetGpio<2, 3>();
+  sjsu::Uart & serial_port = sjsu::lpc40xx::GetUart<0>();
+
+  // Step 3. Configure and initialize peripherals
+  serial_port.settings.baud_rate = 115200;
+  serial_port.Initialize();
+  led.Initialize();
+
+  // Step 4. Use peripherals
+  led.SetAsOutput();
+
+  // Step 5. (OPTIONAL) Add a serial port to the newlib manager in order to
+  sjsu::SysCallManager::Get().AddSerial(serial_port);
+
+  // Step 6. Start Application
+  sjsu::log::Print("Starting Application...\\n");
+
+  int counter     = 0;
+  auto delay_time = 500ms;
+
+  while (1)
   {
-    sjsu::log::Print("Hello World!\\n");
-    sjsu::Delay(1s);
+    led.SetHigh();
+    sjsu::Delay(delay_time);
+
+    led.SetLow();
+    sjsu::Delay(delay_time);
+
+    counter++;
+
+    sjsu::log::Print("Counter = {}!\\n", counter);
   }
 
   return 0;
@@ -88,6 +124,26 @@ def start(context, project_name):
   Start a new firmware project.
   """
 
+  gcc_version = '10-2020-q4-major-'
+  os_extension = ''
+
+  if platform.system() == 'Linux':
+    if platform.machine() == 'x86_64':
+      os_extension = 'x86_64-linux'
+    else:
+      os_extension = 'aarch64-linux'
+  elif platform.system() == 'Darwin':
+    os_extension = 'mac'
+  elif platform.system() == 'Windows':
+    os_extension = 'win32'
+
+  final_branch_name = f'{gcc_version}{os_extension}'
+
+  if not os_extension:
+    click.secho(f'This system {platform.system()}:{platform.machine()} ' +
+                'is not supported for SJSU-Dev2 ', fg='red', bold=True)
+    return -1
+
   click.secho(f'Creating project: {project_name}', fg='white', bold=True)
   Path(project_name).mkdir()
 
@@ -104,18 +160,19 @@ def start(context, project_name):
   click.echo(f'    Creating "{project_name}/main.cpp" source file')
   Path(f'{project_name}/main.cpp').write_text(BASIC_MAIN_CPP)
 
-  click.echo("")
+  click.echo('')
 
-  context.invoke(install, library="libcore", tag="main",
+  context.invoke(install, library='libcore', tag='main',
                  project_directory=project_name)
-  context.invoke(install, library="libarmcortex",
-                 tag="main", project_directory=project_name)
-  context.invoke(install, library="liblpc40xx", tag="main",
+  context.invoke(install, library='libarmcortex',
+                 tag='main', project_directory=project_name)
+  context.invoke(install, library='liblpc40xx', tag='main',
                  project_directory=project_name)
-  context.invoke(install, library="libstm32f10x",
-                 tag="main", project_directory=project_name)
-  context.invoke(install, library="gcc-arm-none-eabi-nano-exceptions",
-                 tag="gcc10-2020-q2-preview", project_directory=project_name)
+  context.invoke(install, library='libstm32f10x',
+                 tag='main', project_directory=project_name)
+
+  context.invoke(install, library='gcc-arm-none-eabi-picolibc',
+                 tag=final_branch_name, project_directory=project_name)
 
 
 @main.command()
@@ -233,7 +290,8 @@ def build_test(test_source_code, compiler, run):
                    '--coverage ' +
                    # Functionality
                    '-fPIC ' +
-                   '-fexceptions '
+                   '-fexceptions ' +
+                   '--exceptions ' +
                    '-fkeep-inline-functions ' +
                    '-fprofile-arcs ' +
                    '-ftest-coverage ' +
@@ -296,7 +354,7 @@ def build_test(test_source_code, compiler, run):
               show_default=True)
 @click.option('--linker_script', '-l', default='default.ld', type=str,
               show_default=True)
-@click.option('--toolchain', '-t', default='gcc-arm-none-eabi-nano-exceptions',
+@click.option('--toolchain', '-t', default='gcc-arm-none-eabi-picolibc',
               type=str, show_default=True)
 @click.option('--compiler', '-c', default='arm-none-eabi-g++', type=str,
               show_default=True)
@@ -333,43 +391,53 @@ def build(source, optimization, platform, linker_script, toolchain, compiler):
   ARTIFACTS_NAME = f'{ARTIFACTS_DIRECTORY}/{PLATFORM}.{SOURCE_FILE_BASENAME}'
   PLATFORM_ARGUMENTS = Path(f'{PLATFORM_GCC_ARGS_PATH}').read_text()
 
-  BUILD_COMMAND = (f'{TOOLCHAIN}/bin/{compiler} ' +
-                   # Functionality
-                   f'-fexceptions ' +
-                   f'-ffunction-sections ' +
-                   f'-fdata-sections ' +
-                   f'-fdiagnostics-color ' +
-                   # Disabled functionality
-                   f'-fno-rtti ' +
-                   f'-fno-threadsafe-statics ' +
-                   f'-fno-omit-frame-pointer ' +
-                   # Warnings
-                   f'-Wno-main ' +
-                   f'-Wall ' +
-                   f'-Wformat=2 ' +
-                   f'-Wno-uninitialized ' +
-                   f'-Wnull-dereference ' +
-                   f'-Wold-style-cast ' +
-                   f'-Woverloaded-virtual ' +
-                   f'-Wsuggest-override ' +
-                   f'-Wno-psabi ' +
-                   # Linker Commands
-                   f'-Wl,--gc-sections ' +
-                   f'-Wl,--print-memory-usage ' +
-                   f'--specs=nano.specs ' +
-                   f'-T {LIBRARY_DIRECTORY}/lib{PLATFORM}/platform/{LINKER_SCRIPT} ' +
-                   # General Compiler Flags
-                   f'-g -std=c++20 ' +
-                   f'-I {LIBRARY_DIRECTORY} ' +
-                   f'-O{OPTIMIZATION_LEVEL} ' +
-                   # Defines
-                   f'-D PLATFORM={PLATFORM} ' +
-                   # Platform specific arguments
-                   f'{PLATFORM_ARGUMENTS} ' +
-                   f'{LIBRARY_DIRECTORY}/lib{PLATFORM}/platform/startup.cpp ' +
-                   f'{SOURCE_FILE} -o {ARTIFACTS_NAME}.elf ' +
-                   # IO Redirects to files
-                   f'1> {ARTIFACTS_NAME}.size.percent 2> {ARTIFACTS_NAME}.log')
+  BUILD_COMMANDS = [f'{TOOLCHAIN}/bin/{compiler}',
+                    # Functionality
+                    '-fexceptions',
+                    '--exceptions',
+                    '-ffunction-sections',
+                    '-fdata-sections',
+                    '-fdiagnostics-color',
+                    # Disabled functionality
+                    '-fno-rtti',
+                    '-fno-threadsafe-statics',
+                    '-fno-omit-frame-pointer',
+                    '-ffreestanding',
+                    # Warnings
+                    '-Wno-main',
+                    '-Wall',
+                    '-Wformat=2',
+                    '-Wno-uninitialized',
+                    '-Wnull-dereference',
+                    '-Wold-style-cast',
+                    '-Woverloaded-virtual',
+                    '-Wsuggest-override',
+                    '-Wno-psabi',
+                    # Linker Commands
+                    '-lgcc',
+                    '-Wl,--gc-sections',
+                    '-Wl,--print-memory-usage',
+                    '-Wl,--print-memory-usage',
+                    # Picolib Commands
+                    '--specs=picolibcpp.specs',
+                    '--oslib=semihost',
+                    '--crt0=hosted',
+                    # Selecting a linker script
+                    f'-T {LIBRARY_DIRECTORY}/lib{PLATFORM}/platform/' +
+                    f'{LINKER_SCRIPT}',
+                    # General Compiler Flags
+                    '-g -std=c++20',
+                    f'-I {LIBRARY_DIRECTORY}',
+                    f'-O{OPTIMIZATION_LEVEL}',
+                    # Defines
+                    f'-D PLATFORM={PLATFORM}',
+                    # Platform specific arguments
+                    f'{PLATFORM_ARGUMENTS}',
+                    f'{SOURCE_FILE} -o {ARTIFACTS_NAME}.elf',
+                    # IO Redirects to files
+                    f'1> {ARTIFACTS_NAME}.size.percent 2> {ARTIFACTS_NAME}.log']
+
+  BUILD_COMMAND = ' '.join(BUILD_COMMANDS)
 
   GENERATE_BINARY = (f'{TOOLCHAIN}/bin/arm-none-eabi-objcopy -O binary ' +
                      f'{ARTIFACTS_NAME}.elf {ARTIFACTS_NAME}.bin')
@@ -395,7 +463,8 @@ def build(source, optimization, platform, linker_script, toolchain, compiler):
                      BUILD_COMMAND,
                      "Failed to build application!")
   except:
-    print(f'Build command:\n{BUILD_COMMAND}')
+    print(f'Build command:\n{BUILD_COMMAND}\n')
+    click.secho('Build Log Contents:\n', bold=True, fg='red')
     print(Path(f'{ARTIFACTS_NAME}.log').read_text())
     return
 
