@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="sammy-sjsu-dev2",
-    version="0.0.2",
+    version="0.0.7",
     author="SJSU-Dev2 Organization",
     description="A tool for managing SJSU-Dev2 firmware projects and to install external packages such as platforms and libraries.",long_description=long_description,
     long_description_content_type="text/markdown",
@@ -20,7 +20,7 @@ setuptools.setup(
     entry_points={
         'console_scripts': ['sammy=sammy.sammy:main'],
     },
-    python_requires='>=3.6',
+    python_requires='>=3.9',
     install_requires=[
       'click>=8.0',
       'giturlparse>=0.10.0',
