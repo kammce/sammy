@@ -3,6 +3,7 @@
 # Standard libraries
 import os
 import shutil
+import stat
 import platform
 from pathlib import Path, PurePath
 
@@ -12,10 +13,12 @@ import requests
 import giturlparse
 
 
-CHECK_MARK = '\u001b[32m\N{white heavy check mark}\u001b[0m'
-CROSS_MARK = '\u001b[31m\N{cross mark}\u001b[0m'
+CHECK_MARK = '\u001b[32m\N{white heavy check mark}\u001b[0m'.encode('utf-8')
+CROSS_MARK = '\u001b[31m\N{cross mark}\u001b[0m'.encode('utf-8')
 
 SJSU_DEV2_URL = 'https://github.com/SJSU-Dev2'
+PACKAGE_REGISTRY = ('https://raw.githubusercontent.com/SJSU-Dev2/' +
+                    'SJSU-Dev2v3/main/registry.json')
 
 BASIC_MAIN_CPP = """
 #include <libcore/platform/syscall.hpp>
@@ -80,6 +83,11 @@ def AttemptToUnlinkPath(path):
     pass
 
 
+def DeleteReadOnlyFiles(action, name, exc):
+  os.chmod(name, stat.S_IWRITE)
+  os.remove(name)
+
+
 def GenerateAndCheck(start_message, command_string, error_message):
   click.echo(click.style(start_message, bold=True), nl=False)
   exit_code = os.system(command_string.replace('\n', ' '))
@@ -112,9 +120,7 @@ def FileUpsearch(file_name, starting_position):
 
 
 def GetListOfSJSUDev2Repos():
-  sj2_repo_info = requests.get('https://api.github.com/orgs/SJSU-Dev2/repos',
-                               params={'per_page': 500}).json()
-  return [x['name'] for x in sj2_repo_info]
+  return requests.get(PACKAGE_REGISTRY).json()
 
 
 @click.group()
@@ -180,7 +186,6 @@ def start(context, project_name):
                  project_directory=project_name)
   context.invoke(install, library='libstm32f10x',
                  tag='main', project_directory=project_name)
-
   context.invoke(install, library='gcc-arm-none-eabi-picolibc',
                  tag=final_branch_name, project_directory=project_name)
 
@@ -198,22 +203,22 @@ def install(library, project_directory, tag):
   try:
     PROJECT_DIRECTORY = FileUpsearch('.sj2', project_directory)
   except:
-    click.secho(f"Could not find a SJSU-Dev2 project!", fg="red")
+    click.secho(f'Could not find a SJSU-Dev2 project!', fg='red')
     return
 
   os.chdir(f'{PROJECT_DIRECTORY}/packages/')
 
-  sj2_repo_list = GetListOfSJSUDev2Repos()
+  package_registry = GetListOfSJSUDev2Repos()
 
   click.secho(f'Installing library: {library}', fg='white', bold=True)
 
-  if library in sj2_repo_list:
-    repo_name = f'{library}'
-    clone_command = f'git clone {SJSU_DEV2_URL}/{library}.git --branch {tag}'
-  else:
-    repo_name = giturlparse.parse(f'{library}').name
-    clone_command = f'git clone {library} --branch {tag}'
+  # If the library is within the package registery, then replace the library's
+  # value with the clone_url from the registry.
+  if library in package_registry:
+    library = package_registry[library]
 
+  repo_name = giturlparse.parse(f'{library}').name
+  clone_command = f'git clone {library} --branch {tag}'
   exit_code = os.system(clone_command)
 
   if exit_code == 0:
@@ -227,11 +232,17 @@ def install(library, project_directory, tag):
     # for the library. Link this to the library directory to give it access to
     # the build system.
     if Path(package_path).exists():
-      Path(library_path).symlink_to(package_path, target_is_directory=True)
-
+      click.secho(f'Linking {package_path} --> {library_path}', fg='magenta')
+      try:
+        Path(library_path).symlink_to(package_path, target_is_directory=True)
+      except:
+        pass
+    else:
+      click.secho(f'NOTE: This package is not a library...', fg='magenta')
     click.echo(CHECK_MARK)
   else:
     click.echo(CROSS_MARK)
+    exit(1)
 
   click.echo('')
 
@@ -243,8 +254,9 @@ def list():
   """
 
   click.secho('List of libraries in SJSU-Dev2\n', fg='white', bold=True)
-  sj2_repo_list = GetListOfSJSUDev2Repos()
-  library_list = [x for x in sj2_repo_list if x.startswith('lib')]
+  package_registry = GetListOfSJSUDev2Repos()
+  library_list = [f'{x : <20}: {package_registry[x]}'
+                  for x in package_registry if x.startswith('lib')]
   print('\n'.join(library_list))
 
 
@@ -264,7 +276,8 @@ def remove(library, project_directory):
     return
 
   AttemptToUnlinkPath(f'{PROJECT_DIRECTORY}/library/{library}')
-  shutil.rmtree(f'{PROJECT_DIRECTORY}/packages/{library}/')
+  shutil.rmtree(f'{PROJECT_DIRECTORY}/packages/{library}/',
+                onerror=DeleteReadOnlyFiles)
 
 
 @main.command()
@@ -359,7 +372,7 @@ def build_test(test_source_code, compiler, run):
 
 @main.command()
 @click.argument('source', type=click.Path(exists=True), default='main.cpp')
-@click.option('--optimization', '-o', default='g', type=str, show_default=True)
+@click.option('--optimization', '-O', default='g', type=str, show_default=True)
 @click.option('--platform', '-p', default='lpc40xx', type=str,
               show_default=True)
 @click.option('--linker_script', '-l', default='default.ld', type=str,
