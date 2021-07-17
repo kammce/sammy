@@ -70,6 +70,16 @@ int main()
 """
 
 
+def AttemptToUnlinkPath(path):
+  # Unlink the library symbolic link and if it does not exist, then
+  # FileNotFoundError is raised. This is acceptable behavior so we need only
+  # catch this exception an continue on.
+  try:
+    Path(path).unlink()
+  except FileNotFoundError:
+    pass
+
+
 def GenerateAndCheck(start_message, command_string, error_message):
   click.echo(click.style(start_message, bold=True), nl=False)
   exit_code = os.system(command_string.replace('\n', ' '))
@@ -210,14 +220,14 @@ def install(library, project_directory, tag):
     library_path = f'{PROJECT_DIRECTORY}/library/{repo_name}'
     package_path = f'{PROJECT_DIRECTORY}/packages/{repo_name}/{repo_name}'
 
-    Path(library_path).unlink(missing_ok=True)
+    AttemptToUnlinkPath(library_path)
 
     # If this is a library, then the repo will contain a directory with the
     # same name as the repo. That directory will contain all the source files
     # for the library. Link this to the library directory to give it access to
     # the build system.
     if Path(package_path).exists():
-      Path(library_path).symlink_to(package_path)
+      Path(library_path).symlink_to(package_path, target_is_directory=True)
 
     click.echo(CHECK_MARK)
   else:
@@ -253,7 +263,7 @@ def remove(library, project_directory):
     click.secho(f"Could not find a SJSU-Dev2 project!", fg="red")
     return
 
-  Path(f'{PROJECT_DIRECTORY}/library/{library}').unlink(missing_ok=True)
+  AttemptToUnlinkPath(f'{PROJECT_DIRECTORY}/library/{library}')
   shutil.rmtree(f'{PROJECT_DIRECTORY}/packages/{library}/')
 
 
@@ -341,7 +351,7 @@ def build_test(test_source_code, compiler, run):
     return
 
   if run:
-    Path(f'{TEST_EXECUTABLE}.gcda').unlink(missing_ok=True)
+    AttemptToUnlinkPath(f'{TEST_EXECUTABLE}.gcda')
     GenerateAndCheck(f'Running \'{TEST_EXECUTABLE}.exe\' ... \n',
                      f'{TEST_EXECUTABLE}.exe',
                      'Failed to build application!')
@@ -414,7 +424,6 @@ def build(source, optimization, platform, linker_script, toolchain, compiler):
                     '-Wsuggest-override',
                     '-Wno-psabi',
                     # Linker Commands
-                    '-lgcc',
                     '-Wl,--gc-sections',
                     '-Wl,--print-memory-usage',
                     '-Wl,--print-memory-usage',
