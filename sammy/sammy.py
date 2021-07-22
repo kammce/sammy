@@ -232,11 +232,7 @@ def install(library, project_directory, tag):
     # for the library. Link this to the library directory to give it access to
     # the build system.
     if Path(package_path).exists():
-      click.secho(f'Linking {package_path} --> {library_path}', fg='magenta')
-      try:
-        Path(library_path).symlink_to(package_path, target_is_directory=True)
-      except:
-        pass
+      Path(library_path).symlink_to(package_path, target_is_directory=True)
     else:
       click.secho(f'NOTE: This package is not a library...', fg='magenta')
     click.echo(CHECK_MARK)
