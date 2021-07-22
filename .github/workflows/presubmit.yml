@@ -1,0 +1,68 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 12 * * 0'
+
+jobs:
+  ubuntu_tests:
+    name: Running Sammy Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, macos-10.15, windows-2019 ]
+        python-version: [3.9]
+    steps:
+      - uses: actions/checkout@v2
+      - name: 🐍 Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 🛎️ Checkout
+        uses: actions/checkout@v2
+
+      - name: 📥 Install Sammy Dependencies
+        run: python3 setup.py install
+
+      - name: ✨ Make a new project
+        run: sammy start project
+
+      - name: ✂️ Copy main.cpp 📋 app.cpp
+        working-directory: project
+        run: cp main.cpp app.cpp
+
+      - name: 🛠️ Build Application (lpc40xx)
+        working-directory: project
+        run: |
+              sammy build
+              test -f ./build/lpc40xx/./lpc40xx.main.cpp.elf
+
+      - name: 🛠️ Build Application (lpc40xx) given source file
+        working-directory: project
+        run: |
+              sammy build app.cpp
+              test -f ./build/lpc40xx/./lpc40xx.app.cpp.elf
+
+      - name: 🛠️ Build Application (stm32f10x) given source file
+        working-directory: project
+        run: |
+              sammy build app.cpp -Os --platform stm32f10x
+              test -f ./build/stm32f10x/./stm32f10x.app.cpp.elf
+
+      - name: 📦 Install libbasis
+        working-directory: project
+        run: |
+              sammy install libbasis
+              test -e ./packages/libbasis/libbasis
+              test -e ./library/libbasis
+
+      - name: 🗑️ Remove libbasis
+        working-directory: project
+        shell: bash
+        run: |
+              sammy remove libbasis
+              ! test -e ./packages/libbasis/libbasis
+              ! test -e ./library/libbasis
