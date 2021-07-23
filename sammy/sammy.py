@@ -351,19 +351,16 @@ def build_test(test_source_code, compiler, run):
                    # Source files and final executable
                    f'{SOURCE_FILE} -o {TEST_EXECUTABLE}.exe')
 
-  try:
-    Path(os.path.dirname(TEST_EXECUTABLE)).mkdir(parents=True, exist_ok=True)
-    GenerateAndCheck(f"Building test '{TEST_EXECUTABLE}.exe' ... ",
-                     BUILD_COMMAND,
-                     "Failed to build application!")
-  except:
-    return
+  Path(os.path.dirname(TEST_EXECUTABLE)).mkdir(parents=True, exist_ok=True)
+  GenerateAndCheck(f"Building test '{TEST_EXECUTABLE}.exe' ... ",
+                   BUILD_COMMAND,
+                   "Failed to build test executable!")
 
   if run:
     AttemptToUnlinkPath(f'{TEST_EXECUTABLE}.gcda')
     GenerateAndCheck(f'Running \'{TEST_EXECUTABLE}.exe\' ... \n',
                      f'{TEST_EXECUTABLE}.exe',
-                     'Failed to build application!')
+                     'Test Executable Failed!')
 
 
 @main.command()
