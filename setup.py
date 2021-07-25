@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="sammy-sjsu-dev2",
-    version="0.1.0",
+    version="0.1.1",
     author="SJSU-Dev2 Organization",
     description="A tool for managing SJSU-Dev2 firmware projects and to install external packages such as platforms and libraries.",long_description=long_description,
     long_description_content_type="text/markdown",
