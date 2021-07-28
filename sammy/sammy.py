@@ -255,6 +255,58 @@ def list():
                   for x in package_registry if x.startswith('lib')]
   print('\n'.join(library_list))
 
+@platform.command()
+def flash():
+  def stop_flash(reason, prompt_clone_or_setup=False):
+    logging.error(reason)
+    if prompt_clone_or_setup:
+      logging.error(f'Please clone the SJSU-Dev2 repository or rerun ./setup')
+    sys.exit(1)
+
+  def get_tools_dir():
+    SJSU_MK_PATH = os.path.expanduser('~') + '/.sjsu_dev2.mk'
+    base_path = None
+    if not os.path.exists(SJSU_MK_PATH):
+      stop_flash('File ~/.sjsu_dev2.mk not found!', prompt_clone_or_setup=True)
+    with open(SJSU_MK_PATH) as file:
+      lines = file.readlines()
+      for line in lines:
+        if 'SJSU_DEV2_BASE' in line:
+          base_path = line.split('= ')[-1].strip()
+          break
+    if base_path == None or not os.path.isdir(base_path):
+      stop_flash('Could not resolve SJSU-Dev2 base path!',
+                 prompt_clone_or_setup=True)
+    else:
+      return base_path + '/tools'
+
+  def get_binary_path():
+    WORKING_DIRECTORY = os.getcwd() + '/'
+    # ensure we are in dev2
+    if 'SJSU-Dev2' not in WORKING_DIRECTORY:
+      stop_flash(
+          'Please run the flash command from within the SJSU-Dev2 directory.')
+    directory_contents = os.listdir()
+    if 'build' not in directory_contents:
+      stop_flash(
+          'Please run the flash command from within your project directory.')
+    os.chdir('build')
+    directory_contents = list(os.walk('.'))
+    for file_tuple in directory_contents:
+      if 'firmware.bin' in file_tuple[2]:
+        file_path = 'build/' + file_tuple[0].split('./')[-1]
+        return WORKING_DIRECTORY + file_path + '/' + 'firmware.bin'
+    stop_flash('Firmware binary not found! ' +
+               'Be sure to complile your program with make application.')
+
+  tools_directory = get_tools_dir()
+  binary_path = get_binary_path()
+  # the below needs changes to function properly
+  os.system(f"source {tools_directory}/nxpprog/modules/bin/activate")
+  os.system(f"python3 {tools_directory}/nxpprog/nxpprog.py " +
+            f"--binary=\"{binary_path}\" --device="" --osfreq=12000000 " +
+            "--baud=115200 --control")
+  return
 
 @main.command()
 @click.argument('library')
